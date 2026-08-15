@@ -1,5 +1,9 @@
 // Utility to parse and clean user math input
 
+import { create, all } from 'mathjs';
+
+const math = create(all);
+
 export function parseMathExpression(input) {
   let cleaned = input.trim();
 
@@ -44,10 +48,82 @@ export function parseMathExpression(input) {
   return cleaned;
 }
 
+// Names that are values rather than variables to solve for.
+const KNOWN_CONSTANTS = new Set([
+  'pi', 'PI', 'tau', 'e', 'E', 'i', 'phi', 'Infinity', 'NaN',
+  'true', 'false', 'null', 'undefined'
+]);
+
+// When an expression contains several variables, these are the conventional
+// ones to differentiate or solve with respect to, in order of preference.
+const PREFERRED_VARIABLES = ['x', 'y', 't', 'z', 'u', 'v', 'n', 'k', 's', 'r'];
+
 export function extractVariable(expression) {
-  // Find the main variable (usually x, but could be y, t, etc.)
-  const match = expression.match(/[a-z]/i);
-  return match ? match[0] : 'x';
+  // Find the main variable (usually x, but could be y, t, etc.).
+  //
+  // This must not simply take the first letter: in "sin(x)" that is the "s" of
+  // the function name, which sends the whole solver off differentiating with
+  // respect to a variable that does not exist.
+  const symbols = collectSymbols(expression);
+
+  if (symbols.length === 0) {
+    return 'x';
+  }
+
+  for (const preferred of PREFERRED_VARIABLES) {
+    if (symbols.includes(preferred)) {
+      return preferred;
+    }
+  }
+
+  return symbols[0];
+}
+
+// Collect candidate variable names, excluding function names and constants.
+function collectSymbols(expression) {
+  const text = String(expression || '');
+  const found = [];
+
+  const add = (name) => {
+    if (!KNOWN_CONSTANTS.has(name) && !found.includes(name)) {
+      found.push(name);
+    }
+  };
+
+  // math.js reads "x^2 - 4 = 0" as an assignment and rejects it, so parse each
+  // side of an equation separately.
+  let parsed = false;
+  for (const part of text.split('=')) {
+    if (!part.trim()) continue;
+
+    try {
+      const node = math.parse(part);
+      parsed = true;
+
+      node.traverse((current, path, parent) => {
+        // A FunctionNode holds its name in `fn`; that is not a variable.
+        const isFunctionName = parent && parent.isFunctionNode && path === 'fn';
+        if (current.isSymbolNode && !isFunctionName) {
+          add(current.name);
+        }
+      });
+    } catch (e) {
+      // Unparseable side - fall back to the textual scan below.
+    }
+  }
+
+  if (parsed) {
+    return found;
+  }
+
+  // Fallback for input math.js cannot parse: drop function calls, then take
+  // whatever identifiers remain.
+  const withoutCalls = text.replace(/[a-zA-Z_]\w*\s*\(/g, '(');
+  for (const name of withoutCalls.match(/[a-zA-Z_]\w*/g) || []) {
+    add(name);
+  }
+
+  return found;
 }
 
 export function extractFunctionFromProblem(problemText) {

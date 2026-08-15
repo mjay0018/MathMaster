@@ -17,7 +17,7 @@ import { solveArithmetic } from '../src/lib/solvers/arithmeticSolver.js';
 import { solveDerivative } from '../src/lib/solvers/derivativesSolver.js';
 import { solveIntegral } from '../src/lib/solvers/integralsSolver.js';
 import { solveAlgebra } from '../src/lib/solvers/algebraSolver.js';
-import { extractFunctionFromProblem } from '../src/lib/mathParser.js';
+import { extractFunctionFromProblem, extractVariable } from '../src/lib/mathParser.js';
 
 // Anything that looks like JavaScript source must never reach the user.
 function assertNoSourceLeak(solution) {
@@ -110,13 +110,38 @@ describe('result validation gate', () => {
   });
 });
 
-describe('known defects', () => {
-  test('variable detection must ignore function names', { todo: 'extractVariable takes the first letter, which is the function name' }, () => {
-    assert.equal(solveDerivative('sin(x)').answer, "f'(x) = cos(x)");
-    assert.equal(solveDerivative('ln(x)').answer, "f'(x) = 1/x");
-    assert.match(solveIntegral('sin(x)').answer, /-cos\(x\)/);
+describe('variable detection', () => {
+  test('ignores function names and constants', () => {
+    assert.equal(extractVariable('sin(x)'), 'x');
+    assert.equal(extractVariable('ln(x)'), 'x');
+    assert.equal(extractVariable('sqrt(x-2)'), 'x');
+    assert.equal(extractVariable('2*sin(3*x)'), 'x');
+    // e is Euler's number, not the variable.
+    assert.equal(extractVariable('e^x'), 'x');
   });
 
+  test('finds the variable actually used', () => {
+    assert.equal(extractVariable('cos(2*t)'), 't');
+    assert.equal(extractVariable('2*y+5=11'), 'y');
+    // Both sides of an equation are considered.
+    assert.equal(extractVariable('x^2-4=0'), 'x');
+  });
+
+  test('falls back to x when there is no variable', () => {
+    assert.equal(extractVariable('2+2'), 'x');
+    assert.equal(extractVariable(''), 'x');
+  });
+
+  test('differentiates and integrates named functions correctly', () => {
+    assert.equal(solveDerivative('sin(x)').answer, "f'(x) = cos(x)");
+    assert.equal(solveDerivative('cos(2*x)').answer, "f'(x) = -2*sin(2*x)");
+    assert.equal(solveDerivative('ln(x)').answer, "f'(x) = 1/x");
+    assert.match(solveIntegral('sin(x)').answer, /-cos\(x\)/);
+    assert.match(solveIntegral('1/x').answer, /log\(x\)/);
+  });
+});
+
+describe('known defects', () => {
   test('implicit multiplication must not break function calls', { todo: '2sin(x) parses to 2*sin*(x)' }, () => {
     assert.equal(extractFunctionFromProblem('2sin(x)'), '2*sin(x)');
   });
