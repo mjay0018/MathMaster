@@ -1,4 +1,6 @@
 import { create, all } from 'mathjs';
+import { isEquation } from '../mathParser.js';
+import { describeResult, unsupportedSolution } from '../resultGuard.js';
 
 const math = create(all);
 
@@ -6,6 +8,21 @@ export function solveArithmetic(expression) {
   try {
     // Clean the expression
     let cleaned = expression.trim();
+
+    // `=` makes math.js treat the input as an assignment, not a calculation.
+    if (isEquation(cleaned)) {
+      return unsupportedSolution(
+        'This looks like an equation - choose the Algebra topic to solve it',
+        {
+          steps: [
+            `This input contains an equals sign: ${cleaned}`,
+            'Arithmetic evaluates expressions such as (5 + 3) * 4; equations are solved under Algebra'
+          ],
+          tips: ['Remove the "=" to evaluate an expression', 'Switch the topic to Algebra to solve for a variable'],
+          common_mistakes: ['Entering an equation where a calculation is expected']
+        }
+      );
+    }
 
     // Detect operation type
     const hasAddition = cleaned.includes('+');
@@ -20,6 +37,23 @@ export function solveArithmetic(expression) {
 
     // Evaluate the expression
     const result = math.evaluate(cleaned);
+
+    // Nothing reaches the UI until it is confirmed renderable.
+    const check = describeResult(result);
+    if (!check.ok) {
+      return unsupportedSolution(`Unable to evaluate - ${check.reason}`, {
+        steps: [
+          `Parse the arithmetic expression: ${cleaned}`,
+          `MathMaster could not evaluate this: ${check.reason}`
+        ],
+        tips: [
+          'Use * for multiplication (e.g., 5*3)',
+          'Use / for division (e.g., 10/2)',
+          'Use ^ for exponents (e.g., 2^3)'
+        ],
+        common_mistakes: ['Missing operators between numbers', 'Incorrect order of operations']
+      });
+    }
 
     // Generate step-by-step based on complexity
     if (hasParentheses) {
@@ -70,8 +104,9 @@ export function solveArithmetic(expression) {
 
     steps.push(`Final Answer: ${result}`);
 
-    // Format the result
-    let formattedResult = result;
+    // Format the result. Non-numeric results fall back to the validated string
+    // from the guard rather than an unchecked toString().
+    let formattedResult = check.text;
     if (typeof result === 'number') {
       // Show as fraction if it's a simple division result
       if (hasDivision && !hasAddition && !hasSubtraction && !hasMultiplication) {

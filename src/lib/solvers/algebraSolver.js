@@ -1,6 +1,6 @@
 import mathsteps from 'mathsteps';
 import { create, all } from 'mathjs';
-import { isEquation, extractVariable } from '../mathParser';
+import { isEquation, extractVariable } from '../mathParser.js';
 
 const math = create(all);
 

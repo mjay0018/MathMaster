@@ -1,6 +1,7 @@
 import Algebrite from 'algebrite';
 import { create, all } from 'mathjs';
-import { extractVariable } from '../mathParser';
+import { extractVariable } from '../mathParser.js';
+import { isUnevaluatedSymbolic, unsupportedSolution } from '../resultGuard.js';
 
 const math = create(all);
 
@@ -10,6 +11,25 @@ export function solveIntegral(expression) {
 
     // Use Algebrite to compute the integral
     const integral = Algebrite.integral(expression, variable).toString();
+
+    // Algebrite returns the operator unchanged (e.g. "integral(...)") when it
+    // cannot integrate. That is a failure, not an answer.
+    if (isUnevaluatedSymbolic(integral)) {
+      return unsupportedSolution(
+        `MathMaster could not integrate ${expression} symbolically`,
+        {
+          steps: [
+            `Identify the function to integrate: ∫(${expression}) d${variable}`,
+            'The symbolic engine could not find an antiderivative for this expression'
+          ],
+          tips: [
+            'Try rewriting the integrand in a simpler form',
+            'Some integrals need a substitution the engine does not attempt automatically'
+          ],
+          common_mistakes: ['Assuming every function has an elementary antiderivative']
+        }
+      );
+    }
 
     // Generate step-by-step explanation
     const steps = generateIntegralSteps(expression, integral, variable);

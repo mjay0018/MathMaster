@@ -1,6 +1,7 @@
 import Algebrite from 'algebrite';
 import { create, all } from 'mathjs';
-import { extractVariable } from '../mathParser';
+import { extractVariable } from '../mathParser.js';
+import { isUnevaluatedSymbolic, unsupportedSolution } from '../resultGuard.js';
 
 const math = create(all);
 
@@ -10,6 +11,25 @@ export function solveDerivative(expression) {
 
     // Use Algebrite to compute the derivative
     const derivative = Algebrite.derivative(expression, variable).toString();
+
+    // Algebrite returns the operator unchanged (e.g. "d(asin(x),x)") when it
+    // cannot differentiate. That is a failure, not an answer.
+    if (isUnevaluatedSymbolic(derivative)) {
+      return unsupportedSolution(
+        `MathMaster could not differentiate ${expression}`,
+        {
+          steps: [
+            `Identify the function to differentiate: f(${variable}) = ${expression}`,
+            'The symbolic engine could not apply a differentiation rule to this expression'
+          ],
+          tips: [
+            'Try the long-form name of inverse trig functions, e.g. arcsin instead of asin',
+            'Check that the function is written in standard notation'
+          ],
+          common_mistakes: ['Using a function name the engine does not recognise']
+        }
+      );
+    }
 
     // Generate step-by-step explanation
     const steps = generateDerivativeSteps(expression, derivative, variable);
