@@ -1,5 +1,6 @@
 import { create, all } from 'mathjs';
-import { extractVariable, parseMathExpression } from '../mathParser';
+import { extractVariable, parseMathExpression, isEquation } from '../mathParser.js';
+import { describeResult, unsupportedSolution } from '../resultGuard.js';
 
 const math = create(all);
 
@@ -112,6 +113,29 @@ function generateLimitGraph(func, variable, approachValue) {
 // Trigonometry Solver
 export function solveTrigonometry(expression) {
   try {
+    // Equations are not expressions. math.js reads `sin(x) = 1/2` as a function
+    // assignment and returns a function object, so route these out before they
+    // ever reach evaluate().
+    if (isEquation(expression)) {
+      return unsupportedSolution(
+        'Trigonometric equations are not supported yet - try evaluating an expression instead',
+        {
+          steps: [
+            `This looks like an equation to solve: ${expression}`,
+            'MathMaster can evaluate trigonometric expressions, but cannot yet solve for the angle'
+          ],
+          tips: [
+            'Evaluate a value instead, e.g. sin(pi/6)',
+            'To find the angle for a known value, use the inverse function, e.g. arcsin(1/2)'
+          ],
+          common_mistakes: [
+            'Entering an equation where an expression is expected',
+            'Mixing up sin(x) = 1/2 (an equation) with arcsin(1/2) (a value)'
+          ]
+        }
+      );
+    }
+
     const steps = [];
     steps.push(`Evaluate the trigonometric expression: ${expression}`);
 
@@ -121,6 +145,19 @@ export function solveTrigonometry(expression) {
 
     // Evaluate the expression
     let result = math.evaluate(expression);
+
+    // Nothing reaches the UI until it is confirmed renderable.
+    const check = describeResult(result);
+    if (!check.ok) {
+      return unsupportedSolution(`Unable to evaluate - ${check.reason}`, {
+        steps: [
+          `Parse the trigonometric expression: ${expression}`,
+          `MathMaster could not evaluate this: ${check.reason}`
+        ],
+        tips: ['Use pi for π', 'For degrees: multiply by pi/180, e.g. cos(60*pi/180)'],
+        common_mistakes: ['Using incorrect notation', 'Entering an equation instead of a value']
+      });
+    }
 
     // Provide context based on the function
     if (expression.toLowerCase().includes('sin')) {
@@ -157,8 +194,9 @@ export function solveTrigonometry(expression) {
       steps.push(`Common value: ${angle.note}`);
     }
 
-    // Format the result nicely
-    let formattedResult = result;
+    // Format the result nicely. Non-numeric results fall back to the validated
+    // string from the guard rather than an unchecked toString().
+    let formattedResult = check.text;
     if (typeof result === 'number') {
       // Round to 4 decimal places
       formattedResult = result.toFixed(4);

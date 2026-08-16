@@ -1,5 +1,5 @@
 // Import IndexedDB functions (local storage - no API needed!)
-import { getAllProblems, addProblem, updateProblem, clearAllProblems } from './indexedDB';
+import { getAllProblems, addProblem, updateProblem, clearAllProblems } from './indexedDB.js';
 
 // Fetch all problem history from local IndexedDB
 export async function fetchProblemHistory() {
@@ -22,12 +22,12 @@ export async function clearProblemHistory() {
 }
 
 // Import solvers
-import { solveAlgebra } from './solvers/algebraSolver';
-import { solveDerivative } from './solvers/derivativesSolver';
-import { solveIntegral } from './solvers/integralsSolver';
-import { solveLimit, solveTrigonometry, solveFunctions } from './solvers/otherSolvers';
-import { solveArithmetic } from './solvers/arithmeticSolver';
-import { extractFunctionFromProblem } from './mathParser';
+import { solveAlgebra } from './solvers/algebraSolver.js';
+import { solveDerivative } from './solvers/derivativesSolver.js';
+import { solveIntegral } from './solvers/integralsSolver.js';
+import { solveLimit, solveTrigonometry, solveFunctions } from './solvers/otherSolvers.js';
+import { solveArithmetic } from './solvers/arithmeticSolver.js';
+import { extractFunctionFromProblem } from './mathParser.js';
 
 // Real math solver using local libraries
 export async function solveProblem(problem, topic) {
